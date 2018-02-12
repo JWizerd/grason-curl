@@ -8,10 +8,6 @@ class Curl_Handler
 {
 
 	protected $user_key;
-	protected $address;
-	protected $city;
-	protected $postal_code;
-	protected $state_code;
 	protected $url;
 	protected $username = null;
 	protected $password = null;
@@ -22,13 +18,11 @@ class Curl_Handler
 	 * @return [set initial values for API request]
 	 */
 
-	public function __construct($user_key, $address, $city, $postal_code, $state_code)  {
+	public function __construct($user_key, $username = null, $password = null)  {
 
-		$this->user_key      = $user_key;
-		$this->address       = $address;
-		$this->city          = $city;
-		$this->postal_code   = $postal_code;
-		$this->state_code    = $state_code;
+		$this->user_key = $user_key;
+		$this->username = $username;
+		$this->password = $password;
 
 	}
 
@@ -69,31 +63,60 @@ class Curl_Handler
 
 class Org extends Curl_Handler {
 
-	protected $username = 'grasons';
-	protected $password = 'DgR7s253iSui3yFwmwcyGqH5tGNeJb';
+	protected $username = null;
+	protected $password = null;
 	protected $base_url = 'https://estatesales.org/api/v2';	
 	protected $timezone = 'US/Central';
+	protected $address;
+	protected $city;
+	protected $postal_code;
+	protected $state_code;
+	protected $lat = null;
+	protected $lon = null;
+
+	public function __construct($user_key, $address, $city, $postal_code, $state_code, $username, $password)  {
+
+		$this->user_key    = $user_key;
+		$this->address     = $address;
+		$this->city        = $city;
+		$this->postal_code = $postal_code;
+		$this->state_code  = $state_code;
+		$this->username    = $username;
+		$this->password    = $password;
+
+	}
 
 	/**
 	 * [for estatesales.org ONLY. Used to POST listings based from GPS coordinates to specify a specific ]
 	 * @param  
-	 * @return obj response 
+	 * @return json response 
 	 */
-	public function getcoordinates() {
+	public function get_coordinates() {
 
 		$geocode_url = $this->base_url . '/geocode/get';
 
-		return $this->request($geocode_url, 'user_key=' . $this->user_key . '&address=' . $this->address . '&city=' . $this->city . '&state_code=' . $this->state_code . '&postal_code=' . $this->postal_code, $this->headers);
+		return json_decode($this->request($geocode_url, 'user_key=' . $this->user_key . '&address=' . $this->address . '&city=' . $this->city . '&state_code=' . $this->state_code . '&postal_code=' . $this->postal_code, $this->headers));
+
+	}
+
+	/**
+	 * [set the locations coordinates from the cURL response get_coordinates()]
+	 */
+
+	public function set_coordinates() {
+		
+		$coords = $this->get_coordinates();
+
+		$this->lat = $coords->location->lat;
+		$this->lon = $coords->location->lon;
 
 	}
 
 }
 
-$org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
+$org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX', 'grasons', 'DgR7s253iSui3yFwmwcyGqH5tGNeJb');
 
 $org->set_content_type('x-www-form-urlencoded');
 $org->set_auth('basic');
 
-$response = $org->getcoordinates();
-
-print_r($response);
+$org->set_coordinates();
