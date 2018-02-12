@@ -16,6 +16,7 @@ class Curl_Handler
 	protected $username = null;
 	protected $password = null;
 	protected $base_url = null;
+	protected $headers = [];
 
 	/**
 	 * @return [set initial values for API request]
@@ -31,13 +32,19 @@ class Curl_Handler
 
 	}
 
-	public function request($url, $endpoint) {
+	public function set_content_type($type) {
+		array_push($this->headers, 'Content-Type:application/' . $type);
+	}
+
+	public function set_auth($type) {
+		if ($type == 'basic') {
+			array_push($this->headers, 'Authorization: Basic '. base64_encode($this->username . ':' . $this->password));	
+		}
+	}
+
+	public function request($url, $endpoint, $headers) {
 
 		$ch = curl_init();
-		$headers = array(
-		    'Content-Type:application/x-www-form-urlencoded',
-		    'Authorization: Basic '. base64_encode($this->username . ":" . $this->password) // <---
-		);
 
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		curl_setopt($ch, CURLOPT_URL, $url);
@@ -76,13 +83,16 @@ class Org extends Curl_Handler {
 
 		$geocode_url = $this->base_url . '/geocode/get';
 
-		return $this->request($geocode_url, 'user_key=' . $this->user_key . '&address=' . $this->address . '&city=' . $this->city . '&state_code=' . $this->state_code . '&postal_code=' . $this->postal_code);
+		return $this->request($geocode_url, 'user_key=' . $this->user_key . '&address=' . $this->address . '&city=' . $this->city . '&state_code=' . $this->state_code . '&postal_code=' . $this->postal_code, $this->headers);
 
 	}
 
 }
 
 $org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
+
+$org->set_content_type('x-www-form-urlencoded');
+$org->set_auth('basic');
 
 $response = $org->getcoordinates();
 
