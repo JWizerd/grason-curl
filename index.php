@@ -9,9 +9,6 @@ class Curl_Handler
 
 	protected $user_key;
 	protected $url;
-	protected $username = null;
-	protected $password = null;
-	protected $base_url = null;
 	protected $headers = [];
 
 	/**
@@ -43,7 +40,7 @@ class Curl_Handler
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_POST, true);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $endpoint);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($endpoint, '', '&'));
 		curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
@@ -63,26 +60,35 @@ class Curl_Handler
 
 class Org extends Curl_Handler {
 
-	protected $username = null;
-	protected $password = null;
+	protected $username = 'grasons';
+	protected $password = 'DgR7s253iSui3yFwmwcyGqH5tGNeJb';
 	protected $base_url = 'https://estatesales.org/api/v2';	
 	protected $timezone = 'US/Central';
 	protected $address;
 	protected $city;
 	protected $postal_code;
 	protected $state_code;
-	protected $lat = null;
-	protected $lon = null;
 
-	public function __construct($user_key, $address, $city, $postal_code, $state_code, $username, $password)  {
+	public function __construct($user_key, $address, $city, $postal_code, $state_code)  {
 
 		$this->user_key    = $user_key;
 		$this->address     = $address;
 		$this->city        = $city;
 		$this->postal_code = $postal_code;
 		$this->state_code  = $state_code;
-		$this->username    = $username;
-		$this->password    = $password;
+		$this->set_base_query();
+
+	}
+
+	private function set_base_query() {
+
+		$this->base_query = [
+					'user_key' => $this->user_key,
+					'address'  => $this->address,
+					'city'     => $this->city,
+					'state_code' => $this->state_code,
+					'postal_code' => $this->postal_code
+				];
 
 	}
 
@@ -95,16 +101,15 @@ class Org extends Curl_Handler {
 
 		$geocode_url = $this->base_url . '/geocode/get';
 
-		return json_decode($this->request($geocode_url, 'user_key=' . $this->user_key . '&address=' . $this->address . '&city=' . $this->city . '&state_code=' . $this->state_code . '&postal_code=' . $this->postal_code, $this->headers));
+		return json_decode($this->request($geocode_url, $this->base_query, $this->headers));
 
 	}
 
 	/**
 	 * [set the locations coordinates from the cURL response get_coordinates()]
 	 */
-
 	public function set_coordinates() {
-		
+
 		$coords = $this->get_coordinates();
 
 		$this->lat = $coords->location->lat;
@@ -112,9 +117,20 @@ class Org extends Curl_Handler {
 
 	}
 
+	/**
+	 * curl -s -u 'grasons:DgR7s253iSui3yFwmwcyGqH5tGNeJb' -X POST -d 'user_key=5749-0950-0d1d-4c13-9ed8-6154&type=traditional&address=18308 Wind Valley 
+	 * Way&city=Pflugerville&state_code=TX&postal_code=78660&lat=30.456157&lon=-97.580859&descr=Test description via API&title=API Sale Title&timezone=US/Central&dates={"2018-02-21": ["9:00", "14:00"], "2018-02-22": ["8:30"]}' 
+	 * https://estatesales.org/api/v2/sale/set
+	 */
+	public function post_listing() {
+
+		$url = $base_url . '/sale/set';
+    
+	}
+
 }
 
-$org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX', 'grasons', 'DgR7s253iSui3yFwmwcyGqH5tGNeJb');
+$org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
 
 $org->set_content_type('x-www-form-urlencoded');
 $org->set_auth('basic');
