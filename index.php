@@ -56,10 +56,6 @@ class Curl_Handler
 
 	}
 
-/**
- * Because I'm lazy and want to just port over one file instead of five files and worry about referencing them on the client's site I'm just going to use one file. Sowwwy.
- */ 
-
 }
 
 class Org extends Curl_Handler {
@@ -139,7 +135,7 @@ class Org extends Curl_Handler {
       'lat' => $this->lat,
       'lon' => $this->lon, 
       'descr' => 'test description', 
-      'title' => 'MadWire TEST POST',
+      'title' => 'MadWire',
       'timezone' => $this->timezone, 
       'dates' => json_encode(
       	[ 
