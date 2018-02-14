@@ -179,28 +179,24 @@ add_action( 'transition_post_status', 'post_estate_sale_to_apis', 10, 3 );
 
 function post_estate_sale_to_apis( $new_status, $old_status, $post ) { 
 
-  print_r($post);
+  $title    = get_the_title($post->ID);
+  $address  = get_field('estate_sale_address');
+  $account  = get_field('estate_sale_account');
+  $city     = get_field('estate_sale_address_city');
+  $state    = get_field('estate_sale_address_state_code');
+  $zipcode  = get_field('estate_sale_address_postal_code');
+  $timezone = get_field('estate_sale_timezone');
+  $descr    = get_field('estate_sale_short_description');
+  $dates    = get_field('estate_sale_sale_dates');
+  $images   = get_field('estate_sale_gallery');
+
+  print_r($address);
+  print_r($images);
+  print_r($account);
 
   if (($old_status == 'auto-draft' && $new_status == 'publish') && $post->post_type == 'estatesales') {
 
-    $title    = get_the_title($post->ID);
-    $address  = get_field('estate_sale_address', $post->ID);
-    $account  = get_field('estate_sale_account', $post->ID);
-    $city     = get_field('estate_sale_address_city', $post->ID);
-    $state    = get_field('estate_sale_address_state_code', $post->ID);
-    $zipcode  = get_field('estate_sale_address_postal_code', $post->ID);
-    $timezone = get_field('estate_sale_timezone', $post->ID);
-    $descr    = get_field('estate_sale_short_description', $post->ID);
-    $dates    = get_field('estate_sale_sale_dates', $post->ID);
-    $images   = get_field('estate_sale_gallery', $post->ID);
-
-    echo '<pre>';
-    print_r($title);
-    print_r($account);
-    print_r($dates);
-    print_r($images);
-    echo '</pre>';
-
+    // $org = new Org($account, $address, $city, $zipcode, $state);
 
     // $org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
 
@@ -211,3 +207,69 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
 
   }
 }
+
+/**
+ * Galery Data
+ * (
+    [0] => Array
+        (
+            [gallery_image] => Array
+                (
+                    [ID] => 217
+                    [id] => 217
+                    [title] => cta-relocation
+                    [filename] => cta-relocation.jpg
+                    [url] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
+                    [alt] => 
+                    [author] => 1
+                    [description] => 
+                    [caption] => 
+                    [name] => cta-relocation
+                    [date] => 2018-01-05 16:11:31
+                    [modified] => 2018-02-14 22:24:33
+                    [mime_type] => image/jpeg
+                    [type] => image
+                    [icon] => http://localhost:8888/grason-curl-wp/wp-includes/images/media/default.png
+                    [width] => 666
+                    [height] => 700
+                    [sizes] => Array
+                        (
+                            [thumbnail] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-150x150.jpg
+                            [thumbnail-width] => 150
+                            [thumbnail-height] => 150
+                            [medium] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-285x300.jpg
+                            [medium-width] => 285
+                            [medium-height] => 300
+                            [medium_large] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
+                            [medium_large-width] => 666
+                            [medium_large-height] => 700
+                            [large] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
+                            [large-width] => 666
+                            [large-height] => 700
+                            [estate_img_thumbnail] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-400x400.jpg
+                            [estate_img_thumbnail-width] => 400
+                            [estate_img_thumbnail-height] => 400
+                            [estate_full_size] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
+                            [estate_full_size-width] => 666
+                            [estate_full_size-height] => 700
+                        )
+
+                )
+
+        )
+
+)
+ */
+
+/**
+ * Date Format
+ * (
+    [0] => Array
+        (
+            [sale_date_picker] => 2018-02-15
+            [sale_date_start_time] => 01:00:00
+            [sale_date_end_time] => 03:00:00
+        )
+
+)
+ */
