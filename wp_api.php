@@ -179,31 +179,34 @@ add_action( 'transition_post_status', 'post_estate_sale_to_apis', 10, 3 );
 
 function post_estate_sale_to_apis( $new_status, $old_status, $post ) { 
 
-  $title    = get_the_title($post->ID);
-  $address  = get_field('estate_sale_address');
-  $account  = get_field('estate_sale_account');
-  $city     = get_field('estate_sale_address_city');
-  $state    = get_field('estate_sale_address_state_code');
-  $zipcode  = get_field('estate_sale_address_postal_code');
-  $timezone = get_field('estate_sale_timezone');
-  $descr    = get_field('estate_sale_short_description');
-  $dates    = get_field('estate_sale_sale_dates');
-  $images   = get_field('estate_sale_gallery');
+  $fields = get_post_meta()
 
-  print_r($address);
-  print_r($images);
-  print_r($account);
+  print_r($_POST);
 
-  if (($old_status == 'auto-draft' && $new_status == 'publish') && $post->post_type == 'estatesales') {
+  if ($old_status == 'auto-draft' && $new_status == 'publish' && $post->post_type == 'estatesales') {
+
+    /**
+     * @todo post meta isn't saved into the database until after the publish_post action fired. 
+     * the one we are tapping into here. So upon submission I need to get access the $_POST Obj and set fields from * there set my ACFs. They are located under $_POST['fields']['field_name']
+     */
+    $title    = get_the_title($post->ID);
+    $address  = get_field('estate_sale_address', $post->ID);
+    $account  = get_field('estate_sale_account', $post->ID);
+    $city     = get_field('estate_sale_address_city', $post->ID);
+    $state    = get_field('estate_sale_address_state_code', $post->ID);
+    $zipcode  = get_field('estate_sale_address_postal_code', $post->ID);
+    $timezone = get_field('estate_sale_timezone', $post->ID);
+    $descr    = get_field('estate_sale_short_description', $post->ID);
+    $dates    = get_field('estate_sale_sale_dates', $post->ID);
+    $images   = get_field('estate_sale_gallery', $post->ID);
 
     // $org = new Org($account, $address, $city, $zipcode, $state);
 
-    // $org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
+    $org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
 
-    // $org->set_content_type('x-www-form-urlencoded');
-    // $org->set_auth('basic');
-    // $org->post_listing();
-
+    $org->set_content_type('x-www-form-urlencoded');
+    $org->set_auth('basic');
+    $org->post_listing();
 
   }
 }
