@@ -153,7 +153,7 @@ class Org extends Curl_Handler {
 
 		$listing = json_decode($this->request($url, $endpoint, $this->headers));
 
-		// publish_listing($listing->sale->id);
+		$this->publish_listing($listing->sale->id);
     
 	}
 
@@ -166,12 +166,21 @@ class Org extends Curl_Handler {
 
 		$url = $this->base_url . '/sale/publish/set';
 
+	  $endpoint = $this->base_query;
+
 		$params = [
 
-			'user_key' => $this->user_key,
-			'user_key' => $this->user_key,
+			'id' => $listing_id,
+			'publish' => true
 
 		];
+
+		// Push values to endpoint storing base_query
+		foreach ($params as $key => $value) {
+			$endpoint[$key] = $value;
+		}
+
+		$this->request($url, $endpoint, $this->headers);
 
 	}
 
