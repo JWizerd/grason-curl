@@ -80,11 +80,12 @@ class Org extends Curl_Handler
   private function set_base_query() {
 
     $this->base_query = [
-          'user_key' => $this->user_key,
-          'address'  => $this->address,
-          'city'     => $this->city,
-          'state_code' => $this->state_code,
-          'postal_code' => $this->postal_code
+          'user_key'    => $this->user_key,
+          'address'     => $this->address,
+          'city'        => $this->city,
+          'state_code'  => $this->state_code,
+          'postal_code' => $this->postal_code,
+          'type'        => 'traditional'
         ];
 
   }
@@ -110,8 +111,8 @@ class Org extends Curl_Handler
 
     $coords = $this->get_coordinates();
 
-    $this->lat = $coords->location->lat;
-    $this->lon = $coords->location->lon;
+    $this->base_query['lat'] = $coords->location->lat;
+    $this->base_query['lon'] = $coords->location->lon;
 
   }
 
@@ -141,37 +142,33 @@ class Org extends Curl_Handler
   }
 
   /**
+   * [post listing to estate sales .org api.]
+   * @param $[params_arr] [<an arr containing all params to add for initial content of post. Images will come next in sequence.>]
    * https://estatesales.org/api/v2/sale/set
    */
-  public function post_listing() {
+  public function post_listing($params_arr) {
 
     $url = $this->base_url . '/sale/set';
 
     $this->set_coordinates();
 
-    $params = [
-      'type' => 'traditional',
-      'lat' => $this->lat,
-      'lon' => $this->lon, 
-      'descr' => 'test description', 
-      'title' => 'TESTING ACF POST FIELDS 2',
-      'timezone' => $this->timezone, 
-      'dates' => json_encode(
-        [ 
-          '2018-02-13' => ["10:30"],  
-          '2018-04-01' => ["16:00"]
-        ]
-      )
-    ];
-
-    $endpoint = $this->build_endpoint($params);
+    $endpoint = $this->build_endpoint($params_arr);
     $listing = json_decode($this->request($url, $endpoint, $this->headers));
 
     $this->set_listing_id($listing->sale->id);
-
-    $this->publish_listing($listing->sale->id);
+    $this->display_listing($listing->sale->id, true);
     
   }
+
+  public function hide_listing()  {
+    /**
+     * @param  listing->id
+     * @todo  I need to set up a database structure that stores listings and relates them to post IDs so upon deletion of a post I can delete a listing
+     */
+    $this->display_listing($listing->sale->id, false);
+  }
+
+
 
   /**
    * [publish_listing on estatesales.org. You can remove a listing by firing another API request to the sale and setting publish=false]
@@ -179,21 +176,19 @@ class Org extends Curl_Handler
    * @return response whether listing was properly published or not
    * https://estatesales.org/api/v2/sale/publish/set
    */
-  private function publish_listing($listing_id) {
+  public function display_listing($listing_id, $show_hide) {
 
     $url = $this->base_url . '/sale/publish/set';
 
     $params = [
 
       'id' => $listing_id,
-      'publish' => true
+      'publish' => $show_hide
 
     ];
 
     $endpoint = $this->build_endpoint($params);
     $response = json_decode($this->request($url, $endpoint, $this->headers));
-
-    print_r($response);
 
   }
 
@@ -201,17 +196,17 @@ class Org extends Curl_Handler
    * [post an image to the estatesales.org account]
    * @return [respsone obj]
    */
-  protected function post_images($images_arr) {
+  public function post_images($images_arr) {
 
     $url = $this->base_url . '/sale/photo/remote/add';
 
     if (count($images_arr) > 0) {
 
-      foreach ($images_arr as $image) {
+      foreach ($images_arr as $row => $image) {
 
         $params = [
           'id' => $this->listing_id,
-          'url' => $image['url']
+          'url' => wp_get_attachment_url($image['field_5a69fa961c0b7'])
         ];
         
         $endpoint = $this->build_endpoint($params);
@@ -223,6 +218,39 @@ class Org extends Curl_Handler
 
   }
 
+  /**
+   * return json formatted obj of date ACFs in proper format for API
+   * @param  an array of dates and times
+   * @return the formatted json dates obj
+   */
+  public function format_dates($dates_arr) {
+
+    $formatted = [];
+
+    foreach ($dates_arr as $row => $date) {
+
+      // format raw format returned from uprocessed ACF
+      $format_in = 'Ymd';
+      $format_out = 'Y-m-d';
+      $temp_date = DateTime::createFromFormat($format_in, $date['field_5a8334c3826bc']);
+      $new_date = $temp_date->format( $format_out );
+
+      if (!empty($date['field_5a833588826bf'])) {
+
+        $formatted[$new_date] = [$date['field_5a83356e826be'], $date['field_5a833588826bf']];  
+
+      } else {
+
+        $formatted[$new_date] = [$date['field_5a83356e826be']];
+
+      }
+
+    }
+
+    return json_encode($formatted);
+
+  }
+
 }
 
 
@@ -231,9 +259,9 @@ add_action( 'transition_post_status', 'post_estate_sale_to_apis', 10, 3 );
 
 function post_estate_sale_to_apis( $new_status, $old_status, $post ) { 
 
-  if ($old_status == 'auto-draft' && $new_status == 'publish' && $post->post_type == 'estatesales') {
+  if (($old_status == 'draft' || $old_status == 'auto-draft') && $new_status == 'publish' && $post->post_type == 'estatesales') {
 
-    $fields = $_POST['acf'];
+    $fields   = $_POST['acf'];  
     $title    = get_the_title($post->ID);
     $address  = $fields['field_5a69f982b7d3a'];
     $account  = $fields['field_5a83313334dc9'];
@@ -243,82 +271,21 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
     $timezone = $fields['field_5a833d1c1c319'];
     $descr    = $fields['field_5a8330f0e668a'];
     $dates    = $fields['field_5a69f9e9b7d3c'];
-    // the images post field returns the id for the media item so use get_media_item to get post thumbnail url
     $images   = $fields['field_5a69fa731c0b6'];
 
     $org = new Org($account, $address, $city, $zipcode, $state);
-
-    // $org = new Org('5749-0950-0d1d-4c13-9ed8-6154', '18308 Wind Valley Way', 'Pflugerville', '78660', 'TX');
+    
+    $params = [
+      'descr' => $descr, 
+      'title' => $title,
+      'timezone' => $timezone, 
+      'dates' => $org->format_dates($dates)
+    ];
 
     $org->set_content_type('x-www-form-urlencoded');
     $org->set_auth('basic');
-    $org->post_listing();
+    $org->post_listing($params);
 
   }
+
 }
-
-/**
- * Galery Data
- * (
-    [0] => Array
-        (
-            [gallery_image] => Array
-                (
-                    [ID] => 217
-                    [id] => 217
-                    [title] => cta-relocation
-                    [filename] => cta-relocation.jpg
-                    [url] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
-                    [alt] => 
-                    [author] => 1
-                    [description] => 
-                    [caption] => 
-                    [name] => cta-relocation
-                    [date] => 2018-01-05 16:11:31
-                    [modified] => 2018-02-14 22:24:33
-                    [mime_type] => image/jpeg
-                    [type] => image
-                    [icon] => http://localhost:8888/grason-curl-wp/wp-includes/images/media/default.png
-                    [width] => 666
-                    [height] => 700
-                    [sizes] => Array
-                        (
-                            [thumbnail] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-150x150.jpg
-                            [thumbnail-width] => 150
-                            [thumbnail-height] => 150
-                            [medium] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-285x300.jpg
-                            [medium-width] => 285
-                            [medium-height] => 300
-                            [medium_large] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
-                            [medium_large-width] => 666
-                            [medium_large-height] => 700
-                            [large] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
-                            [large-width] => 666
-                            [large-height] => 700
-                            [estate_img_thumbnail] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation-400x400.jpg
-                            [estate_img_thumbnail-width] => 400
-                            [estate_img_thumbnail-height] => 400
-                            [estate_full_size] => http://localhost:8888/grason-curl-wp/wp-content/uploads/2018/01/cta-relocation.jpg
-                            [estate_full_size-width] => 666
-                            [estate_full_size-height] => 700
-                        )
-
-                )
-
-        )
-
-)
- */
-
-/**
- * Date Format
- * (
-    [0] => Array
-        (
-            [sale_date_picker] => 2018-02-15
-            [sale_date_start_time] => 01:00:00
-            [sale_date_end_time] => 03:00:00
-        )
-
-)
- */

@@ -110,8 +110,10 @@ class Org extends Curl_Handler
 
     $coords = $this->get_coordinates();
 
-    $this->lat = $coords->location->lat;
-    $this->lon = $coords->location->lon;
+    $this->base_query['lat'] = $coords->location->lat;
+    $this->base_query['lon'] = $coords->location->lon;
+
+    print_r($this->base_query);
 
   }
 
@@ -151,8 +153,6 @@ class Org extends Curl_Handler
 
     $params = [
       'type' => 'traditional',
-      'lat' => $this->lat,
-      'lon' => $this->lon, 
       'descr' => 'test description', 
       'title' => 'TESTING ACF POST FIELDS',
       'timezone' => $this->timezone, 
