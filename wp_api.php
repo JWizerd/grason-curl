@@ -4,7 +4,41 @@
  * @author 02.09.2018 Jeremiah Wodke <[<jeremiah.wodke@madwiremedia.com>]> 
  */
 
-class Curl_Handler 
+class DB 
+{
+  protected $host    = 'localhost';
+  protected $db      = 'grason_curl_wordpress';
+  protected $user    = 'root';
+  protected $pass    = 'root';
+  protected $charset = 'utf8mb4';
+  public $pdo;
+
+  public function __construct() {
+    $this->open_connection();
+  }  
+
+  public function get_pdo_obj($pdo) {
+    return $this->pdo;
+  }
+
+  public function open_connection() {
+    $dsn = "mysql:host=$this->host;dbname=$this->db;charset=$this->charset";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+    try {
+      $this->pdo = new PDO($dsn, $this->user, $this->pass, $options);
+    }
+    catch(Exception $e) {
+      echo $e->getMessage();
+    }
+  }
+
+}
+
+class Curl_Handler
 {
 
   protected $user_key;
@@ -156,19 +190,17 @@ class Org extends Curl_Handler
     $listing = json_decode($this->request($url, $endpoint, $this->headers));
 
     $this->set_listing_id($listing->sale->id);
-    $this->display_listing($listing->sale->id, true);
+    // $this->display_listing($listing->sale->id, true);
     
   }
 
+  /**
+   * @param  listing->id
+   * @todo  I need to set up a database structure that stores listings and relates them to post IDs so upon deletion of a post I can delete a listing
+   */
   public function hide_listing()  {
-    /**
-     * @param  listing->id
-     * @todo  I need to set up a database structure that stores listings and relates them to post IDs so upon deletion of a post I can delete a listing
-     */
     $this->display_listing($listing->sale->id, false);
   }
-
-
 
   /**
    * [publish_listing on estatesales.org. You can remove a listing by firing another API request to the sale and setting publish=false]
@@ -205,7 +237,7 @@ class Org extends Curl_Handler
       foreach ($images_arr as $row => $image) {
 
         $params = [
-          'id' => $this->listing_id,
+          'sale_id' => $this->listing_id,
           'url' => wp_get_attachment_url($image['field_5a69fa961c0b7'])
         ];
         
@@ -215,7 +247,23 @@ class Org extends Curl_Handler
       }
       
     }
+  
+  }
+  
+  /**
+   * 
+   * this method can be used to query the recently created sale to check for errors. Useful for image upload errors.
+   * @return response sale obj
+   */
+  public function get_sale($listing_id) {
+    $url = $this->base_url . '/sale/get';
 
+    $endpoint = [
+      'user_key' => $this->user_key,
+      'id'       => $listing_id
+    ];
+
+     return json_decode($this->request($url, $endpoint, $this->headers));
   }
 
   /**
@@ -251,6 +299,21 @@ class Org extends Curl_Handler
 
   }
 
+  /**
+   * Store Listing in DB for DELETION and UPDATE Methods
+   * @param  [int] $post_id 
+   * @param  [int] $listing_id [listing id generated from api to estatesales.org]
+   */
+  public function save($post_id, $listing_id) {
+    $db = new DB();
+    $stmt = $db->pdo->prepare("INSERT INTO listings (post_id, listing_id) VALUES (:post_id, :listing_id)");
+    $stmt->execute([$post_id, $listing_id]);
+
+    // close connection
+    $db = null;
+    $stmt = null; 
+  }
+
 }
 
 
@@ -261,6 +324,7 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
 
   if (($old_status == 'draft' || $old_status == 'auto-draft') && $new_status == 'publish' && $post->post_type == 'estatesales') {
 
+    $id       = $post->ID;
     $fields   = $_POST['acf'];  
     $title    = get_the_title($post->ID);
     $address  = $fields['field_5a69f982b7d3a'];
@@ -285,7 +349,11 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
     $org->set_content_type('x-www-form-urlencoded');
     $org->set_auth('basic');
     $org->post_listing($params);
-
+    $org->post_images($images);
+    $org->save($id, $org->get_listing_id());
+    
+    die();
+    
   }
 
 }
