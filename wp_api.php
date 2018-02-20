@@ -81,7 +81,7 @@ class Curl_Handler
     $response = curl_exec ($ch);
     $status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE); //get status code
     curl_close ($ch);
-
+    
     return $response;
 
   }
@@ -383,7 +383,11 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
       ];
 
       $org->post_listing($params);
-      $org->post_images($images);
+
+      if (!empty($images)) {
+        $org->post_images($images);  
+      }
+      
       $org->save($id, $org->get_listing_id());
       
     } elseif ($old_status == 'publish' &&  $new_status == 'trash') {
@@ -414,7 +418,11 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
       ];
 
       $org->post_listing($params);
-      $org->post_images($images);
+
+      if (!empty($images)) {
+        $org->post_images($images);
+      }
+      
       $org->save($id, $org->get_listing_id());
 
     }
