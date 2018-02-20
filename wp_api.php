@@ -13,6 +13,9 @@ class DB
   protected $charset = 'utf8mb4';
   public $pdo;
 
+  /**
+   * @param run open connection method checks db connection provides error reporting and 
+   */
   public function __construct() {
     $this->open_connection();
   }  
@@ -38,12 +41,79 @@ class DB
 
 }
 
+/**
+ * class Listing is a database abstraction layer / Service for handling 
+ * db operations for all listings communicating with our application. 
+ * I thought this would be a good design so that db operations were 
+ * abstracted from specific classes but the class represented a listing model 
+ * rather than the DB set up itself. Static methods were used because I don't 
+ * want instances created and causing unnecessary code bloat at this point in time
+ * since there aren't properties that need to be set for this class to fulfill it's
+ * purpose.
+ */
+class Listing {
+  /**
+   * retrieve listing id related to post
+   * @param  [int] $post_id
+   * @return [id] [the listing id taken from api]
+   */
+  
+  public static function get($post_id) {
+    $db = new DB();
+    $stmt = $db->pdo->prepare("SELECT listing_id, user_key FROM listings WHERE post_id = ?"); 
+    $stmt->execute([$post_id]);
+    $listing = $stmt->fetch();
+    // close connection
+    $db = null;
+    $stmt = null;
+    return $listing;
+  }
+
+  public static function delete($post_id) {
+  
+    $db = new DB();
+    $stmt = $db->pdo->prepare("DELETE FROM listings WHERE post_id = ?");
+    $stmt->execute([$post_id]);
+    // close connection
+    $db = null;
+    $stmt = null;
+
+  }
+
+  public static function update() {
+    $db = new DB();
+    $stmt = $db->pdo->prepare("INSERT INTO listings (post_id, listing_id, user_key) VALUES (?, ?, ?)");
+    $stmt->execute([$post_id, $listing_id, $account]);
+
+    // close connection
+    $db = null;
+    $stmt = null; 
+  }
+
+  /**
+   * Store Listing in DB for DELETION and UPDATE Methods
+   * @param  [int]    $post_id 
+   * @param  [int]    $listing_id [listing id generated from api to estatesales.org]
+   * @param  [string] $account [the user_key taken from $account acf]
+   */
+  public static function save($post_id, $listing_id, $account) {
+    $db = new DB();
+    $stmt = $db->pdo->prepare("INSERT INTO listings (post_id, listing_id, user_key) VALUES (?, ?, ?)");
+    $stmt->execute([$post_id, $listing_id, $account]);
+
+    // close connection
+    $db = null;
+    $stmt = null; 
+  }
+}
+
 class Curl_Handler
 {
 
   protected $user_key;
   protected $url;
   protected $headers = [];
+  protected $base_query;
 
   /**
    * @return [set initial values for API request]
@@ -67,6 +137,13 @@ class Curl_Handler
     }
   }
 
+  /**
+   * @param [type] $arr [arr of params to bind to cURL request in build_param()]
+   */
+  public function set_base_query($arr) {
+    $this->base_query = $arr;
+  }
+
   public function request($url, $endpoint, $headers) {
 
     $ch = curl_init();
@@ -83,6 +160,23 @@ class Curl_Handler
     curl_close ($ch);
     
     return $response;
+
+  }
+
+  /**
+   * @param Associative Array of Params
+   * @return [type] [description]
+   */
+  protected function build_endpoint($params) {
+
+    $endpoint = $this->base_query;
+    
+    // Push values to endpoint storing base_query
+    foreach ($params as $key => $value) {
+      $endpoint[$key] = $value;
+    }
+
+    return $endpoint;
 
   }
 
@@ -107,20 +201,16 @@ class Org extends Curl_Handler
     $this->city        = $city;
     $this->postal_code = $postal_code;
     $this->state_code  = $state_code;
-    $this->set_base_query();
-
-  }
-
-  private function set_base_query() {
-
-    $this->base_query = [
-          'user_key'    => $this->user_key,
-          'address'     => $this->address,
-          'city'        => $this->city,
-          'state_code'  => $this->state_code,
-          'postal_code' => $this->postal_code,
-          'type'        => 'traditional'
-        ];
+    $this->set_base_query(
+      [
+        'user_key'    => $this->user_key,
+        'address'     => $this->address,
+        'city'        => $this->city,
+        'state_code'  => $this->state_code,
+        'postal_code' => $this->postal_code,
+        'type'        => 'traditional'
+      ]
+    );
 
   }
 
@@ -150,56 +240,12 @@ class Org extends Curl_Handler
 
   }
 
-  private function set_listing_id($id) {
+  protected function set_listing_id($id) {
     $this->listing_id = $id;
   }
 
   public function get_listing_id() {
     return $this->listing_id;
-  }
-
-  /**
-   * retrieve listing id related to post
-   * @param  [int] $post_id
-   * @return [id] [the listing id taken from api]
-   */
-  private function get_db_listing_info($post_id) {
-    $db = new DB();
-    $stmt = $db->pdo->prepare("SELECT listing_id, user_key FROM listings WHERE post_id = ?"); 
-    $stmt->execute([$post_id]);
-    $listing = $stmt->fetch();
-    // close connection
-    $db = null;
-    $stmt = null;
-    return $listing;
-  }
-
-  public function delete_db_listing($post_id) {
-  
-    $db = new DB();
-    $stmt = $db->pdo->prepare("DELETE FROM listings WHERE post_id = ?");
-    $stmt->execute([$post_id]);
-    // close connection
-    $db = null;
-    $stmt = null;
-
-  }
-
-  /**
-   * @param Associative Array of Params
-   * @return [type] [description]
-   */
-  private function build_endpoint($params) {
-
-    $endpoint = $this->base_query;
-    
-    // Push values to endpoint storing base_query
-    foreach ($params as $key => $value) {
-      $endpoint[$key] = $value;
-    }
-
-    return $endpoint;
-
   }
 
   /**
@@ -230,7 +276,7 @@ class Org extends Curl_Handler
 
   public function hide_listing($post_id) {
 
-    $info = $this->get_db_listing_info($post_id);
+    $info = Listing::get($post_id);
     $user_key = $info['user_key'];
     $listing_id = $info['listing_id'];
     $this->display_listing($user_key, $listing_id, 'false');
@@ -331,21 +377,6 @@ class Org extends Curl_Handler
 
   }
 
-  /**
-   * Store Listing in DB for DELETION and UPDATE Methods
-   * @param  [int] $post_id 
-   * @param  [int] $listing_id [listing id generated from api to estatesales.org]
-   */
-  public function save($post_id, $listing_id) {
-    $db = new DB();
-    $stmt = $db->pdo->prepare("INSERT INTO listings (post_id, listing_id, user_key) VALUES (?, ?, ?)");
-    $stmt->execute([$post_id, $listing_id, $this->user_key]);
-
-    // close connection
-    $db = null;
-    $stmt = null; 
-  }
-
 }
 
 
@@ -388,13 +419,13 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
         $org->post_images($images);  
       }
       
-      $org->save($id, $org->get_listing_id());
+      Listing::save($id, $org->get_listing_id(), $account);
       
     } elseif ($old_status == 'publish' &&  $new_status == 'trash') {
 
 
       $org->hide_listing($id);
-      $org->delete_db_listing($id);
+      Listing::delete($id);
       /**
        * @todo  delete all media files related to a post when post is trashed
        * @link( wp_delete_attachment( $gallery_id, true ), https://developer.wordpress.org/reference/functions/wp_delete_attachment/)
@@ -408,7 +439,7 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
        */
 
       $org->hide_listing($id);
-      $org->delete_db_listing($id);
+      Listing::delete($id);
 
       $params = [
         'descr' => $descr, 
@@ -422,8 +453,8 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
       if (!empty($images)) {
         $org->post_images($images);
       }
-      
-      $org->save($id, $org->get_listing_id());
+
+      Listing::save($id, $org->get_listing_id(), $account);
 
     }
     
