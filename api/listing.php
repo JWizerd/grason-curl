@@ -64,4 +64,21 @@ class Listing {
     $db = null;
     $stmt = null; 
   }
+
+  /**
+   * permanently delete images related to a post from the application
+   * @param  [int] $post_id
+   * @param  [array] $gallery [a collection of gallery images from estate sales ACF]
+   */
+  public static function delete_images($gallery, $post_id) {
+
+    if (!empty($gallery)) {
+
+      foreach ($gallery as $row) {
+        wp_delete_attachment( $row['gallery_image']['id'], true );
+      }
+
+    }
+
+  }
 }

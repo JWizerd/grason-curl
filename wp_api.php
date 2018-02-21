@@ -54,17 +54,10 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
 
       $org->hide_listing($id);
       Listing::delete($id);
-      /**
-       * @todo  delete all media files related to a post when post is trashed
-       * @link( wp_delete_attachment( $gallery_id, true ), https://developer.wordpress.org/reference/functions/wp_delete_attachment/)
-       */
+      Listing::delete_images(get_field('estate_sale_gallery', $post->ID), $post->ID);
 
       
     } elseif ($old_status == 'publish' &&  $new_status == 'publish') {
-
-      /**
-       * @todo  test to see if this section works
-       */
 
       $org->hide_listing($id);
 
