@@ -42,24 +42,24 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
       ];
 
       $org->post_listing($params);
-
-      if (!empty($images)) {
-        $org->post_images($images);  
-      }
-      
+      $org->post_images($images);  
       Listing::save($id, $org->get_listing_id(), $account);
       
     } elseif ($old_status == 'publish' &&  $new_status == 'trash') {
 
-
       $org->hide_listing($id);
       Listing::delete($id);
       Listing::delete_images(get_field('estate_sale_gallery', $post->ID), $post->ID);
-
       
     } elseif ($old_status == 'publish' &&  $new_status == 'publish') {
 
-      $org->hide_listing($id);
+      /**
+       * get previous account's user_key just in case it
+       * changed so we can remove the old listing from the old account
+       */
+      $prev_account = Listing::get($id)['user_key'];
+
+      $org->hide_listing($id, $prev_account);
 
       $params = [
         'descr' => $descr, 
@@ -69,11 +69,7 @@ function post_estate_sale_to_apis( $new_status, $old_status, $post ) {
       ];
 
       $org->post_listing($params);
-
-      if (!empty($images)) {
-        $org->post_images($images);
-      }
-
+      $org->post_images($images);
       Listing::update($id, $org->get_listing_id(), $account);
 
     }

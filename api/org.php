@@ -88,12 +88,12 @@ class Org extends Curl_Handler
 
   }
 
-  public function hide_listing($post_id) {
+  public function hide_listing($post_id, $account = '') {
 
     $info = Listing::get($post_id);
-    $user_key = $info['user_key'];
+    $user_key = $user_key || $info['user_key'];
     $listing_id = $info['listing_id'];
-    $this->display_listing($user_key, $listing_id, 'false');
+    $this->display_listing($account, $listing_id, 'false');
 
   }
 
@@ -124,7 +124,7 @@ class Org extends Curl_Handler
 
     $url = $this->base_url . '/sale/photo/remote/add';
 
-    if (count($images_arr) > 0) {
+    if (!empty($images_arr)) {
 
       foreach ($images_arr as $row => $image) {
 
