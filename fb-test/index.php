@@ -111,9 +111,9 @@ class Facebook_Api {
 
       } catch(Facebook\Exceptions\FacebookSDKException $e) {
 
-      // When validation fails or other local issues
-      echo 'There was an Error with Facebook SDK. Please Contact Administrator with this Error Message: ' . $e->getMessage();
-      exit;
+        // When validation fails or other local issues
+        echo 'There was an Error with Facebook SDK. Please Contact Administrator with this Error Message: ' . $e->getMessage();
+        exit;
 
       }
 
@@ -184,15 +184,4 @@ echo '<pre>';
 echo '<strong>connected</strong> </br>';
 print_r($fb_api);
 echo '<pre>';
-
-// $id = $fb_api->post_post(382465355264738, $content);
-
-// $content = [
-//   'link'   => 'http://railroad-injuries.com',
-//   'message' => 'final test'
-// ];
-
-// $update = $fb_api->update_post(382465355264738, $content, $id);
-
-// $delete = $fb_api->delete_post($id);
 
