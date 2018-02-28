@@ -20,13 +20,23 @@ class Curl_Handler
 
   }
 
+  public function set_header($type) {
+    array_push($this->headers, $type);
+  }
+
   public function set_content_type($type) {
     array_push($this->headers, 'Content-Type:application/' . $type);
   }
 
   public function set_auth($type) {
-    if ($type == 'basic') {
-      array_push($this->headers, 'Authorization: Basic '. base64_encode($this->username . ':' . $this->password));  
+    switch ($type) {
+      case 'basic':
+        array_push($this->headers, 'Authorization: Basic '. base64_encode($this->username . ':' . $this->password));  
+        break;
+      
+      case 'xauth':
+        array_push($this->headers, 'X-Authorization:' . $this->user_key);  
+        break;
     }
   }
 
@@ -37,14 +47,22 @@ class Curl_Handler
     $this->base_query = $arr;
   }
 
-  public function request($url, $endpoint, $headers) {
+  public function request($url, $endpoint = null, $headers, $message_body = null) {
 
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($endpoint, '', '&'));
+    if (!is_null($endpoint)) {
+
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($endpoint, '', '&')); 
+
+    } elseif(!is_null($message_body)) {
+
+      curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message_body)); 
+     
+    }
     curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
@@ -71,6 +89,12 @@ class Curl_Handler
 
     return $endpoint;
 
+  }
+
+  protected function build_message_body($params) {
+    $body = $this->base_query;
+    array_push($message, $params);
+    return $body;
   }
 
 }
