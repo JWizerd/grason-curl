@@ -1,5 +1,7 @@
 <?php 
 
+/** (°_ʖ°) */
+
 class Curl_Handler
 {
 
@@ -17,6 +19,7 @@ class Curl_Handler
     $this->user_key = $user_key;
     $this->username = $username;
     $this->password = $password;
+    $this->token    = $token;
 
   }
 
@@ -25,7 +28,13 @@ class Curl_Handler
   }
 
   public function set_content_type($type) {
-    array_push($this->headers, 'Content-Type:application/' . $type);
+    switch ($type) {
+      case 'urlencoded':
+        array_push($this->headers, 'Content-Type:application/x-www-form-urlencoded' . $type);
+        break;
+      case 'application':
+        array_push($this->headers, 'Content-Type:application/' . $type);
+        break;
   }
 
   public function set_auth($type) {
@@ -35,8 +44,11 @@ class Curl_Handler
         break;
       
       case 'xauth':
-        array_push($this->headers, 'X-Authorization:' . $this->user_key);  
+        array_push($this->headers, 'X-Authorization: '. $this->user_key);  
         break;
+
+      case 'bearer':
+        array_push($this->headers, 'Authorization: Bearer '. $this->token);
     }
   }
 
