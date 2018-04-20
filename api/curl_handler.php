@@ -9,6 +9,7 @@ class Curl_Handler
   protected $url;
   protected $headers = [];
   protected $base_query;
+  protected $token;
 
   /**
    * @return [set initial values for API request]
@@ -35,6 +36,7 @@ class Curl_Handler
       case 'application':
         array_push($this->headers, 'Content-Type:application/' . $type);
         break;
+    }
   }
 
   public function set_auth($type) {
@@ -52,6 +54,14 @@ class Curl_Handler
     }
   }
 
+  public function get_token() {
+    return $this->token;
+  }
+
+  public function get_headers() {
+    return $this->headers;
+  }
+
   /**
    * @param [type] $arr [arr of params to bind to cURL request in build_param()]
    */
@@ -59,20 +69,25 @@ class Curl_Handler
     $this->base_query = $arr;
   }
 
-  public function request($url, $endpoint = null, $headers, $message_body = null) {
+  public function request($url, $endpoint = null, $headers, $message_body = null, $message_type = null) {
 
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
+
     if (!is_null($endpoint)) {
 
       curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($endpoint, '', '&')); 
 
     } elseif(!is_null($message_body)) {
 
-      curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message_body)); 
+      if ($message_type === 'json') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message_body));
+      } elseif ($message_type === 'form') {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message_body, '', '&')); 
+      }
      
     }
     curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
@@ -80,6 +95,7 @@ class Curl_Handler
 
     $response = curl_exec ($ch);
     $status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE); //get status code
+
     curl_close ($ch);
     
     return $response;

@@ -86,6 +86,13 @@ public Sale UnpublishSale(int saleId)
 
 
 
+/// <summary>
+/// This call will publish the sale onto the EstateSales.NET website for public viewing.
+/// </summary>
+/// <param name="saleId">The Id of the sale to be published</param>
+/// <param name="autoPayAnyBalance">If this is set to false and there is a balance on the sale, it will
+/// not be published. If it is set to true, the balance will be paid with the organization's credit card
+/// on file. If the payment fails, the sale will not be published.</param>
 public Sale PublishSale(int saleId, bool autoPayAnyBalance)
 {
     RestRequest request = this.CreateRestRequest($"/api/public-sales/{saleId}/publish/{autoPayAnyBalance}", Method.POST);
