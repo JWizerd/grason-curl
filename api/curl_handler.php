@@ -74,8 +74,6 @@ class Curl_Handler
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
 
     if (!is_null($endpoint)) {
 
@@ -83,13 +81,10 @@ class Curl_Handler
 
     } elseif(!is_null($message_body)) {
 
-      if ($message_type === 'json') {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message_body));
-      } elseif ($message_type === 'form') {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message_body, '', '&')); 
-      }
+      $this->message_handler($message_type, $message_body);
      
     }
+
     curl_setopt($ch, CURLOPT_TIMEOUT, 30); //timeout after 30 seconds
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
@@ -100,6 +95,14 @@ class Curl_Handler
     
     return $response;
 
+  }
+
+  protected function message_handler($message_type, $message_body) {
+    if ($message_type === 'json') {
+      curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message_body));
+    } elseif ($message_type === 'form') {
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($message_body, '', '&')); 
+    }
   }
 
   /**
@@ -117,6 +120,21 @@ class Curl_Handler
 
     return $endpoint;
 
+  }
+
+  protected function operation($type) {
+    switch ($type) {
+      case 'post':
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($endpoint, '', '&'));
+        break;
+      
+      case 'get':
+      
+        curl_setopt($ch, CURLOPT_URL, $url);
+        break;
+    }
   }
 
   protected function build_message_body($params) {
