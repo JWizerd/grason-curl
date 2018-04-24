@@ -16,13 +16,20 @@ class Net extends BaseApi
      */
     const SALE_TYPE = 1;
 
+
+    /**
+     * We always want to show the end time if available 
+     * when creating dates for estate sales
+     */
+    const SHOW_END_TIME = true;
+
     /**
      * show address type is required I have no idea what 
      * the different types are as there is no documentation
      */
     const SHOW_ADDRESS_TYPE = 1;
 
-	public function __construct(array $details, $token)  
+	public function __construct(array $details, string $token)  
     {
         $this->orgId         = $details['account'];
         $this->name          = $details['title'];
@@ -45,15 +52,6 @@ class Net extends BaseApi
     }
 
     /**
-     * for better usability of GuzzleHttp\Client instantiation
-     * @return [obj]
-     */
-    protected function api() 
-    {
-        return (new GuzzleHttp\Client(['base_uri' => $this->api_base]));   
-    }
-
-    /**
      * All api requests require a temporary access_token that technically expires in 30 min
      * but since this is GoLive and we don't have time to accommodate for the myriad of edge cases
      * that an application such as this provides... We generate an access token every time a request is made
@@ -72,10 +70,34 @@ class Net extends BaseApi
             'refresh_token' => $this->refresh_token
         ];
 
-        $response = $client->request('POST', '/token', [ 'headers' => $headers, 'form_params' => $form_params ]);
+        $response = $client->post('/token', [ 'headers' => $headers, 'form_params' => $form_params ]);
 
         return json_decode($response->getBody())->access_token;
 	}
+
+    /**
+     * POST a sale to a .net account
+     * @return response obj containing a new listings id
+     * @todo  store listing id in Listing database
+     */
+    protected function post_sale() 
+    {
+        return $this->create(
+            'public-sales',
+            [
+                'orgId'            => $this->orgId,
+                'saleType'         => $this::SALE_TYPE,
+                'postalCodeNumber' => $this->zip,
+                'address'          => $this->address,
+                'name'             => $this->name,
+                'description'      => $this->description,
+                'showAddressType'  => $this::SHOW_ADDRESS_TYPE,
+                'url'              => $this->url,
+                'terms'            => '',
+                'directions'       => ''
+            ]
+        );
+    }
 
     /**
      * Take a path to an image [in this case the post thumbnail url]
@@ -86,9 +108,9 @@ class Net extends BaseApi
      * post request. The url to the image is also required LOL. 
      * @param  [string] absolute image path
      * @return [array] massive image byte array
-     * @see   [<description>]
+     * @see   [SELF::post_images()]
      */
-    protected function convert_image_to_byte_array($image_path) 
+    protected function convert_image_to_byte_array(string $image_path) 
     {
 
         $opts = [
@@ -118,62 +140,161 @@ class Net extends BaseApi
             array_push($image, ord($char)); 
         }
         
-        return json_encode($image);
+        return $image;
 
     }
 
     /**
-     * POST a sale to a .net account
-     * @return response obj containing a new listings id
-     * @todo  store listing id in Listing database
+     * @param  array  Wordpress image array. Most likely a child of a parent image collection.
+     * @return the id of the newly posted image
      */
-    public function create() 
+    protected function post_image(array $image) 
     {
-        $response = $this->api()->request('POST', 'public-sales', [
-            'headers' => $this->headers,
-            'json' => [
-                'orgId' => $this->orgId,
-                'saleType' => $this::SALE_TYPE,
-                'postalCodeNumber' => $this->zip,
-                'address' => $this->address,
-                'name' => $this->name,
-                'description' => $this->description,
-                'showAddressType' => $this::SHOW_ADDRESS_TYPE,
-                'url' => $this->url,
-                'terms' => '',
-                'directions' => ''
+        return $this->create(
+            'sale-pictures', 
+            [
+            'saleId'       => $this->listingId,
+            'description'  => $image['description'],
+            'url'          => $image['website_url'],
+            'imageData'    => $this->convert_image_to_byte_array($image['url']),
+            'thumbnailUrl' => $image['url']
             ]
-        ]);
-
-        return json_decode($response->getBody());
+        )->id;
     }
 
-    protected function post_images(array $image_paths) 
+    /**
+     * post every image from ACF Gallery Collection
+     * @param  array  $images ACF Gallery Collection
+     * @return an array newly posted image ids
+     */
+    public function post_images(array $images) {
+        return array_map([$this, 'post_image'], $images);
+    }
+
+    /**
+     * Date format must be in 
+     * @param  string $date ACF datetime
+     * @return string TZ - UTC formated datetime 
+     */
+    protected function format_date(string $date) 
     {
-
+        return gmdate("Y-m-d\TH:i:s\Z", strtotime($date));
     }
 
-    public function update($id) 
+    protected function post_date($date) 
     {
-
+        return $this->create(
+            'sale-dates',
+            [
+                'saleId' => $this->listingId,
+                'utcStartDate' => $this->format_date($date['start']),
+                'utcEndDate' => $this->format_date($date['end']),
+                'showEndTime' => $this::SHOW_END_TIME
+            ]
+        )->id;
     }
 
-    public function delete($id) 
+    protected function post_dates(array $dates)
     {
-        
+        return array_map([$this, 'post_date'], $dates);
     }
+
+    /**
+     * POST a Sale, it's images and it's dates to the API
+     * then, store the id of the listing and serialized arrays 
+     * into the Listings table
+     * IMPORTANT NOTE: due to 
+     * @param  $images_arr ACF Gallery Collection
+     * @param  $dates_arr ACF DATETIME Collection
+     * @todo  Store data in Listings Table
+     */
+    public function create_sale(array $images_arr, $dates_arr) 
+    {
+        $this->listingId = $this->post_sale()->id;
+        $images = json_encode($this->post_images($images_arr));
+        $dates = json_encode($this->post_dates($dates_arr));
+
+        echo $images;
+        echo $dates;
+    }
+
+    public function update_sale($id) 
+    {
+        if ($this->exists($id)) {
+            $this->update(
+                'put',
+                'public-sales/' . (string)$id,
+                [
+                    'orgId'            => $this->orgId,
+                    'saleType'         => $this::SALE_TYPE,
+                    'postalCodeNumber' => $this->zip,
+                    'address'          => $this->address,
+                    'name'             => $this->name,
+                    'description'      => $this->description,
+                    'showAddressType'  => $this::SHOW_ADDRESS_TYPE,
+                    'url'              => $this->url,
+                    'terms'            => '',
+                    'directions'       => ''
+                ]
+            );
+        } else {
+            $this->post_sale();
+        }
+    }
+
+    protected function exists($id) {
+        try { 
+            $this->get('public-sales/' . (string)$id);
+        } catch (GuzzleHttp\Exception\ClientException $e) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    public function delete_sale($id) 
+    {
+        $this->delete('public-sales/' . (string)$id);
+    }
+
 }
 
 // testing
 
 $details = [
     'account'     => 23126,
-    'title'       => 'GRASON TEST FROM APP',
+    'title'       => 'GRASON TEST FROM APP 2',
     'description' =>  'test description',
     'address'     => '1714 keyes court',
     'zip'         => '80538',
     'url'         => 'http://example.com'
 ];
 
+$images = [
+    [
+        'description' => 'sample desc',
+        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+        'website_url' => '"https://grasons.com'
+    ],
+    [
+        'description' => 'sample desc 2',
+        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+        'website_url' => '"https://grasons.com'
+    ],
+    [
+        'description' => 'sample desc 3',
+        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+        'website_url' => '"https://grasons.com'
+    ]
+];
+
+$dates = [
+    [
+        'start' => date("Y-m-d H:i:s"),
+        'end' => '2018-04-27 23:06:17'
+    ]
+];
+
 $net = new Net($details, $creds['net']['refresh_token']);
-// print_r($net->create());
+
+$net->create_sale($images, $dates);
