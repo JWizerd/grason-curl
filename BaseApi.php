@@ -39,7 +39,6 @@ abstract class BaseApi
 
     public function create(string $endpoint, array $data) 
     {
-
         return json_decode(
             $this->api()->post(
                 $endpoint, 
@@ -86,5 +85,15 @@ abstract class BaseApi
                 'headers' => $this->headers
             ]
         );
+    }
+
+    /**
+     * Date format must be in 
+     * @param  string $date ACF datetime
+     * @return string TZ - UTC formated datetime 
+     */
+    protected function format_date(string $date) 
+    {
+        return gmdate("Y-m-d\TH:i:s\Z", strtotime($date));
     }
 }

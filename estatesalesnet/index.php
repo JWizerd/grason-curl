@@ -173,16 +173,6 @@ class Net extends BaseApi
         return array_map([$this, 'post_image'], $this->images);
     }
 
-    /**
-     * Date format must be in 
-     * @param  string $date ACF datetime
-     * @return string TZ - UTC formated datetime 
-     */
-    protected function format_date(string $date) 
-    {
-        return gmdate("Y-m-d\TH:i:s\Z", strtotime($date));
-    }
-
     protected function post_date($date) 
     {
         return $this->create(

@@ -1,105 +1,164 @@
 <?php 
 
-require_once('../api/curl_handler.php');
+$creds = include '../api_credentials.php';
+require '../BaseApi.php';
 
-class Com extends Curl_Handler {
-	protected $company;
-	protected $account = 1626; 
-	protected $url = 'https://www.estatesale.com/api/v1/trans.php'; 
-	protected $country = 'US';
-	protected $address;
-	protected $city;
-	protected $postal_code;
-	protected $state_code;
+class Com extends BaseApi 
+{
+    const ACCOUNT = 1626; 
+    const URL = 'https://www.estatesale.com/api/v1/'; 
+    const BASE = 'trans.php';
+    const TYPE = 'sale';
 
-	public function __construct($company, $address, $city, $postal_code, $state_code)  {
-		$this->company     = $company;
-	  $this->address     = $address;
-	  $this->city        = $city;
-	  $this->postal_code = $postal_code;
-	  $this->state_code  = $state_code;
-    $this->set_auth_key();
-	}
-  
-  /**
-   * @var string [<the master auth key for the account>]
-   * @todo set auth key from ACF option in WP
-   */
-	protected function set_auth_key() {
-		$this->user_key  = '61BSC-iGw4C-2Ot0D-v5gd8-QONC2';
-	}
-  
-  /**
-   * @return [string] [the .com auth hash]
-   */
-	protected function get_auth_key() {
-		return $this->password;
-	}
+    public function __construct(array $details, array $images, array $dates, string $auth_key)  
+    {
+      $this->company     = $details['company'];
+      $this->address     = $details['address'];
+      $this->city        = $details['city'];
+      $this->zip         = $details['zip'];
+      $this->state       = $details['state'];
+      $this->title       = $details['title'];
+      $this->description = $details['description'];
+      $this->url         = $details['url'];
+      $this->images      = $images;
+      $this->dates       = $dates;
+      $this->token       = $auth_key;
+      $this->set_api_base();
+    }
 
-	protected function get_account() {
-		return $this->account;
-	}
+    protected function set_api_base() 
+    {
+        $this->api_base  = $this::URL;
+        $this->set_header('X-Authorization', $this->token);
+        $this->set_header('Content-Type', 'application/json');
+    }  
 
-	public function encode_params(){
-		$params = [
-      'operation' => 'save',
-      'accountNumber' => $this->accountNumber,
-      'data' => []
-		];
-	}
+    /**
+     * post a listing to estatesale.com
+     * @param  [arr] $params_arr [array of parameters to post to message body in cURL handler]
+     * @return [response]        [a response containing info about successfully created listing or an error message]
+     */
+    public function post_sale() 
+    {
+        $body = [
+            'operation' => 'save',
+            'accountNumber' => $this::ACCOUNT,
+            'data' => [
+                'companyInformation' => [ 
+                  'estatesaleCompanyId' => $this->company
+                ],
+                'listings' => [
+                    [
+                        'listingId' => uniqid(),
+                        'listingType' => $this::TYPE,
+                        'title' => $this->title,
+                        'description' => $this->description,
+                        'address1' => $this->address,
+                        'city' => $this->city,
+                        'stateAbbrev' => $this->state,
+                        'country' => $this::COUNTRY,
+                        'zipCode' => $this->zip,
+                        'auction' => [
+                            'catalogUrl' => $this->url
+                        ],
+                        'saleDates' => [
+                            'saleDate1'    => '2018-5-27T09:05:00ZPT',
+                            'saleEndTime1' => '02:05:00ZPT',
+                            'saleDate2'    => '2018-5-30T09:05:00ZPT',
+                            'saleEndTime2' => '02:05:00ZPT'
+                        ],
+                        'images' => $this->images
+                    ]
+                ]
+            ]
+        ];
 
-	/**
-	 * post a listing to estatesale.com
-	 * @param  [arr] $params_arr [array of parameters to post to message body in cURL handler]
-	 * @return [response]        [a response containing info about successfully created listing or an error message]
-	 */
-	public function post_listing($params_arr) {
+        return json_encode((array)$this->create($this::BASE, $body)->data->listings[0]);
+    }
 
-		$params = [
-      'operation' => 'save'
-		];
+    public function delete_sale($id) 
+    {
+        $this->create(
+            $this::BASE,
+            [
+                'operation' => 'remove',
+                'accountNumber' => $this::ACCOUNT,
+                'data' => [
+                    'companyInformation' => [ 
+                      'listingId' => $this->company
+                    ],
+                    'listings' => [
+                        'listingId' => '5ae0f7989f389',
+                        'estateSaleListingsId' => 171643
+                    ]
+                ]
+            ]
+        );
+    }
 
-    return json_decode($this->request($this->url, null, $this->headers, $params_arr));
+    public function update_sale($id)
+    {
+        $this->delete_sale($id);
+        print_r($this->post_sale());
+    }
 
-  }
+    /**
+     * Date format must be in 
+     * @param  string $date ACF datetime
+     * @return string TZ - PT formated datetime 
+     */
+    protected function format_date(string $date) 
+    {
+        return gmdate("Y-m-d\TH:i:s\ZPT", strtotime($date));
+    }
+
+    /**
+     * Date format must be in 
+     * @param  string $date ACF datetime
+     * @return string TZ - PT formated datetime 
+     */
+    protected function format_time(string $date) 
+    {
+        return gmdate("H:i:s\ZPT", strtotime($date));
+    }
 
 }
 
-$com = new Com(3501, '1714 keyes court', 'loveland', 80537, 'CO');
-$com->set_auth('xauth');
-$com->set_content_type('json');
-
-$params = [
-  'accountNumber' => 1626,
-  'data' => [
-  	'companyInformation' => [ 
-      'estatesaleCompanyId' => 3501
-  	],
-	  'listings' => [
-	  	[
-        'listingId' => '365bro',
-        'listingType' => 'sale',
-        'title' => 'test listing CREATE from code',
-        'description' => 'test description',
-        'address1' => '1714 keyes court',
-        'city' => 'loveland',
-        'stateAbbrev' => 'CO',
-        'country' => 'US',
-        'zipCode' => '80537',
-        'saleDates' => [
-          'saleDate1' => '2018-02-28T09:05:00ZPT',
-          'saleEndTime1' => '09:05:00ZPT'
-        ],
-        'images' => [
-          [
-            'id' => '2123123',
-            'fileName' => 'cta-downsizing.jpg',
-            'url' => 'http://grasonscodev.madwirebuild4.com/wp-content/uploads/2018/01/cta-downsizing.jpg'
-          ]
-        ]
-	  	]
-    ]
-  ]
+$details = [
+  'company' => 3501,
+  'address' => '1714 keyes court',
+  'city'    => 'loveland',
+  'zip'     => 80537,
+  'state'   => 'CO',
+  'title'   => 'FINAL',
+  'description' => 'sample description',
+  'url'         => 'http://example.com'
 ];
 
-print_r($com->post_listing($params));
+$images =  [
+    [
+      'id' => '2123123',
+      'fileName' => 'cta-downsizing.jpg',
+      'url' => 'http://grasonscodev.madwirebuild4.com/wp-content/uploads/2018/01/cta-downsizing.jpg'
+    ],
+    [
+      'id' => '1234234123',
+      'fileName' => 'cta-downsizing.jpg',
+      'url' => 'http://grasonscodev.madwirebuild4.com/wp-content/uploads/2018/01/cta-downsizing.jpg'
+    ]
+];
+
+$dates = [
+   [
+     'saleDate1' => '2018-02-28T09:05:00ZPT',
+     'saleEndTime1' => '09:05:00ZPT'
+   ], 
+   [
+     'saleDate2' => '2018-02-28T09:05:00ZPT',
+     'saleEndTime2' => '09:05:00ZPT'
+   ]
+];
+
+$com = new Com($details, $images, $dates, $creds['com']['token']);
+print_r($com->post_sale());
+// print_r($com->update_sale('5ae0f47967851'));
