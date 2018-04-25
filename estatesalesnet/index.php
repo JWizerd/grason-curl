@@ -29,7 +29,7 @@ class Net extends BaseApi
      */
     const SHOW_ADDRESS_TYPE = 1;
 
-	public function __construct(array $details, string $token)  
+	public function __construct(array $details, array $images, array $dates, string $token)  
     {
         $this->orgId         = $details['account'];
         $this->name          = $details['title'];
@@ -39,6 +39,8 @@ class Net extends BaseApi
         $this->url           = $details['url'];
         $this->refresh_token = $token;
         $this->set_api_base();
+        $this->images        = $images;
+        $this->dates         = $dates;
 	}
 
     /**
@@ -167,8 +169,8 @@ class Net extends BaseApi
      * @param  array  $images ACF Gallery Collection
      * @return an array newly posted image ids
      */
-    public function post_images(array $images) {
-        return array_map([$this, 'post_image'], $images);
+    public function post_images() {
+        return array_map([$this, 'post_image'], $this->images);
     }
 
     /**
@@ -194,9 +196,9 @@ class Net extends BaseApi
         )->id;
     }
 
-    protected function post_dates(array $dates)
+    protected function post_dates()
     {
-        return array_map([$this, 'post_date'], $dates);
+        return array_map([$this, 'post_date'], $this->dates);
     }
 
     /**
@@ -208,11 +210,11 @@ class Net extends BaseApi
      * @param  $dates_arr ACF DATETIME Collection
      * @todo  Store data in Listings Table
      */
-    public function create_sale(array $images_arr, $dates_arr) 
+    public function create_sale() 
     {
         $this->listingId = $this->post_sale()->id;
-        $images = json_encode($this->post_images($images_arr));
-        $dates = json_encode($this->post_dates($dates_arr));
+        $images = json_encode($this->post_images());
+        $dates = json_encode($this->post_dates());
 
         echo $images;
         echo $dates;
@@ -261,40 +263,40 @@ class Net extends BaseApi
 
 // testing
 
-$details = [
-    'account'     => 23126,
-    'title'       => 'GRASON TEST FROM APP 2',
-    'description' =>  'test description',
-    'address'     => '1714 keyes court',
-    'zip'         => '80538',
-    'url'         => 'http://example.com'
-];
+// $details = [
+//     'account'     => 23126,
+//     'title'       => 'GRASON TEST FROM APP 2',
+//     'description' =>  'test description',
+//     'address'     => '1714 keyes court',
+//     'zip'         => '80538',
+//     'url'         => 'http://example.com'
+// ];
 
-$images = [
-    [
-        'description' => 'sample desc',
-        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-        'website_url' => '"https://grasons.com'
-    ],
-    [
-        'description' => 'sample desc 2',
-        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-        'website_url' => '"https://grasons.com'
-    ],
-    [
-        'description' => 'sample desc 3',
-        'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-        'website_url' => '"https://grasons.com'
-    ]
-];
+// $images = [
+//     [
+//         'description' => 'sample desc',
+//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+//         'website_url' => '"https://grasons.com'
+//     ],
+//     [
+//         'description' => 'sample desc 2',
+//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+//         'website_url' => '"https://grasons.com'
+//     ],
+//     [
+//         'description' => 'sample desc 3',
+//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+//         'website_url' => '"https://grasons.com'
+//     ]
+// ];
 
-$dates = [
-    [
-        'start' => date("Y-m-d H:i:s"),
-        'end' => '2018-04-27 23:06:17'
-    ]
-];
+// $dates = [
+//     [
+//         'start' => date("Y-m-d H:i:s"),
+//         'end' => '2018-04-27 23:06:17'
+//     ]
+// ];
 
-$net = new Net($details, $creds['net']['refresh_token']);
+$net = new Net($details, $images, $dates, $creds['net']['refresh_token']);
 
-$net->create_sale($images, $dates);
+$net->create_sale();
