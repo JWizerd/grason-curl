@@ -53,6 +53,7 @@ abstract class BaseApi
 
     public function create(string $endpoint, array $data) 
     {
+        print_r(json_encode($data));
         return json_decode(
             $this->api()->post(
                 $endpoint, 
