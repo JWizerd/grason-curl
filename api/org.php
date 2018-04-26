@@ -1,36 +1,50 @@
 <?php
 
-class Org extends Curl_Handler 
+require '../BaseApi.php';
+
+class Org extends BaseApi 
 {
+    const BASE_URL = 'https://estatesales.org/api/v2'; 
+    const TIMEZONE = 'US/Central';
+    const TYPE     = 'traditional';
 
-  protected $username = 'grasons';
-  protected $password = 'DgR7s253iSui3yFwmwcyGqH5tGNeJb';
-  protected $base_url = 'https://estatesales.org/api/v2'; 
-  protected $timezone = 'US/Central';
-  protected $address;
-  protected $city;
-  protected $postal_code;
-  protected $state_code;
+    public function __construct(array $details, array $images, array $dates)  
+    {
+        $this->account     = $details['account'];
+        $this->title       = $details['title'];
+        $this->description = $details['description'];
+        $this->base_query  =
+          [
+            'user_key'    => $this->account,
+            'address'     => $details['address'],
+            'city'        => $details['city'],
+            'state_code'  => $details['state'],
+            'postal_code' => $details['zip'],
+            'type'        => $this::TYPE
+          ];
+        $this->set_api_base();
+    }
 
-  public function __construct($user_key, $address, $city, $postal_code, $state_code)  {
+    protected function set_api_base() 
+    {  
+        $creds = $this->get_credentials('org');
+        
+        try {
 
-    $this->user_key    = $user_key;
-    $this->address     = $address;
-    $this->city        = $city;
-    $this->postal_code = $postal_code;
-    $this->state_code  = $state_code;
-    $this->set_base_query(
-      [
-        'user_key'    => $this->user_key,
-        'address'     => $this->address,
-        'city'        => $this->city,
-        'state_code'  => $this->state_code,
-        'postal_code' => $this->postal_code,
-        'type'        => 'traditional'
-      ]
-    );
+            if ($creds === false) {
+                throw new Exception('Org credentials do not exist. Please provide proper username and password');
+            } 
 
-  }
+            $this->api_base  = $this::BASE_URL;
+            $this->set_header('auth', [$creds['username'], $creds['password']]);
+            print_r($this->headers);
+
+        } catch(Exception $e) {
+
+            echo $e->getMessage();
+
+        }
+    }  
 
   /**
    * [for estatesales.org ONLY. Used to POST listings based from GPS coordinates to specify a specific ]
@@ -38,33 +52,13 @@ class Org extends Curl_Handler
    * @return json response 
    * https://estatesales.org/api/v2/geocode/get
    */
-  public function get_coordinates() {
+    public function set_coordinates() 
+    {
+        $response = $this->create('geocode/get', $this->base_query);
 
-    $geocode_url = $this->base_url . '/geocode/get';
-
-    return json_decode($this->request($geocode_url, $this->base_query, $this->headers));
-
-  }
-
-  /**
-   * [set the locations coordinates from the cURL response get_coordinates()]
-   */
-  private function set_coordinates() {
-
-    $coords = $this->get_coordinates();
-
-    $this->base_query['lat'] = $coords->location->lat;
-    $this->base_query['lon'] = $coords->location->lon;
-
-  }
-
-  protected function set_listing_id($id) {
-    $this->listing_id = $id;
-  }
-
-  public function get_listing_id() {
-    return $this->listing_id;
-  }
+        $this->base_query['lat'] = $response->coords->lat;
+        $this->base_query['lon'] = $response->coords->lon;
+    }
 
   /**
    * [publish_listing on estatesales.org. You can remove a listing by firing another API request to the sale and setting publish=false]
@@ -73,18 +67,17 @@ class Org extends Curl_Handler
    * https://estatesales.org/api/v2/sale/publish/set
    */
   public function display_listing($user_key, $listing_id, $show_hide) {
-
-    $url = $this->base_url . '/sale/publish/set';
-
-    $params = [
-      
-      'user_key' => $user_key,
-      'id' => $listing_id,
-      'publish' => $show_hide
-
-    ];
     
-    $response = json_decode($this->request($url, $params, $this->headers));
+    $this->create(
+        'sale/publis/set', 
+        [
+          
+          'user_key' => $user_key,
+          'id' => $listing_id,
+          'publish' => $show_hide
+
+        ]
+    );
 
   }
 
@@ -102,44 +95,49 @@ class Org extends Curl_Handler
    * @param $[params_arr] [<an arr containing all params to add for initial content of post. Images will come next in sequence.>]
    * https://estatesales.org/api/v2/sale/set
    */
-  public function post_listing($params_arr) {
-
-    $url = $this->base_url . '/sale/set';
-
+  public function create_listing($params_arr) 
+  {
     $this->set_coordinates();
-
-    $endpoint = $this->build_endpoint($params_arr);
-    $listing = json_decode($this->request($url, $endpoint, $this->headers));
-
-    $this->set_listing_id($listing->sale->id);
-    $this->display_listing($this->user_key, $listing->sale->id, 'true');
-    
+    $this->id = $this->post_sale();
+    $this->post_images();
+    $this->display_listing($this->user_key, $this->id, 'true'); 
   } 
 
+  protected function post_sale() 
+  {
+    $params = $this->base_query;
+    $params['title'] = $this->title;
+    $params['description'] = $this->description;
+
+    return $this->create('sale/set', $params)->id;
+  }
+
   /**
-   * [post an image to the estatesales.org account]
-   * @return [respsone obj]
+   * @param  array  Wordpress image array. Most likely a child of a parent image collection.
+   * @return the id of the newly posted image
    */
-  public function post_images($images_arr) {
+  protected function post_image(array $image) 
+  {
+    return $this->create(
+        'sale/photo/remote/add', 
+        [
+            'sale_id' => $this->id,
+            'url' => wp_get_attachment_url($image['field_5a69fa961c0b7'])
+        ]
+    )->id;
+  }
 
-    $url = $this->base_url . '/sale/photo/remote/add';
-
-    if (!empty($images_arr)) {
-
-      foreach ($images_arr as $row => $image) {
-
-        $params = [
-          'sale_id' => $this->listing_id,
-          'url' => wp_get_attachment_url($image['field_5a69fa961c0b7'])
-        ];
-        
-        $endpoint = $this->build_endpoint($params);
-        $response = json_decode($this->request($url, $endpoint, $this->headers));
-
-      }
-      
+  /**
+   * post every image from ACF Gallery Collection
+   * @param  array  $images ACF Gallery Collection
+   * @return an array newly posted image ids
+   */
+  public function post_images() 
+  {
+    if (!empty($this->images)) {
+        return array_map([$this, 'post_image'], $this->images);
     }
-  
+    return;
   }
   
   /**
@@ -147,15 +145,15 @@ class Org extends Curl_Handler
    * this method can be used to query the recently created sale to check for errors. Useful for image upload errors.
    * @return response sale obj
    */
-  public function get_sale($listing_id) {
-    $url = $this->base_url . '/sale/get';
-
-    $endpoint = [
-      'user_key' => $this->user_key,
-      'id'       => $listing_id
-    ];
-
-     return json_decode($this->request($url, $endpoint, $this->headers));
+  public function get_sale($listing_id) 
+  {
+    $this->get(
+        'sale/get', 
+        [
+            'user_key' => $this->user_key,
+            'id'       => $listing_id
+        ]
+    );
   }
 
   /**
@@ -192,3 +190,18 @@ class Org extends Curl_Handler
   }
 
 }
+
+$details = [
+    'account' => '5749-0950-0d1d-4c13-9ed8-6154',
+    'title' => 'Sample',
+    'description' => 'Sample',
+    'address' => '1714 keyes court',
+    'city' => 'loveland',
+    'state' => 'CO',
+    'zip' => 80537
+];
+
+$images = [];
+$dates = [];
+
+$org = new Org($details, $images, $dates);

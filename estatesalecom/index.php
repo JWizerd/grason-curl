@@ -1,6 +1,5 @@
 <?php 
 
-$creds = include '../api_credentials.php';
 require '../BaseApi.php';
 
 class Com extends BaseApi 
@@ -10,7 +9,7 @@ class Com extends BaseApi
     const BASE = 'trans.php';
     const TYPE = 'sale';
 
-    public function __construct(array $details, array $images, array $dates, string $auth_key)  
+    public function __construct(array $details, $images = [], array $dates)  
     {
       $this->company     = $details['company'];
       $this->address     = $details['address'];
@@ -22,15 +21,29 @@ class Com extends BaseApi
       $this->url         = $details['url'];
       $this->images      = $images;
       $this->dates       = $dates;
-      $this->token       = $auth_key;
       $this->set_api_base();
     }
 
     protected function set_api_base() 
     {
-        $this->api_base  = $this::URL;
-        $this->set_header('X-Authorization', $this->token);
-        $this->set_header('Content-Type', 'application/json');
+        $creds = $this->get_credentials('com');
+
+        try {
+
+            if ($creds === false) {
+                throw new Exception('Com credentials do not exist. Please provide proper username and password');
+            } 
+
+            $this->api_base  = $this::URL;
+            $this->set_header('X-Authorization', $creds['token']);
+            $this->set_header('Content-Type', 'application/json');
+            print_r($this->headers);
+
+        } catch(Exception $e) {
+
+            echo $e->getMessage();
+
+        }
     }  
 
     /**
@@ -66,12 +79,16 @@ class Com extends BaseApi
                             'saleEndTime1' => '02:05:00ZPT',
                             'saleDate2'    => '2018-5-30T09:05:00ZPT',
                             'saleEndTime2' => '02:05:00ZPT'
-                        ],
-                        'images' => $this->images
+                        ]
                     ]
                 ]
             ]
         ];
+
+        if (!empty($this->images)) {
+            $body['date']['listings'][0]['images'] = $this->images;
+        }
+        return;
 
         return json_encode((array)$this->create($this::BASE, $body)->data->listings[0]);
     }
@@ -159,6 +176,6 @@ $dates = [
    ]
 ];
 
-$com = new Com($details, $images, $dates, $creds['com']['token']);
-print_r($com->post_sale());
+$com = new Com($details, $images, $dates);
+// print_r($com->post_sale());
 // print_r($com->update_sale('5ae0f47967851'));

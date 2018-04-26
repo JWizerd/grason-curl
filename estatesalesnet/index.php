@@ -4,7 +4,6 @@
  * @author  Jeremiah Wodke <[<jeremiah.wodke@madwiremedia.com>]> 2018
  */
 
-$creds = include '../api_credentials.php';
 require '../BaseApi.php';
 
 class Net extends BaseApi 
@@ -29,7 +28,9 @@ class Net extends BaseApi
      */
     const SHOW_ADDRESS_TYPE = 1;
 
-	public function __construct(array $details, array $images, array $dates, string $token)  
+    protected $token;
+
+	public function __construct(array $details, $images = [], array $dates)  
     {
         $this->orgId         = $details['account'];
         $this->name          = $details['title'];
@@ -37,7 +38,6 @@ class Net extends BaseApi
         $this->address       = $details['address'];
         $this->zip           = $details['zip'];
         $this->url           = $details['url'];
-        $this->refresh_token = $token;
         $this->set_api_base();
         $this->images        = $images;
         $this->dates         = $dates;
@@ -48,9 +48,25 @@ class Net extends BaseApi
      */
     protected function set_api_base() 
     {
-        $this->api_base  = $this::BASE_URL . '/api/';
-        $this->set_header('Authorization', 'Bearer ' . $this->generate_temporary_access_token());
-        $this->set_header('X_XSRF', 'X_XSRF');
+
+        $creds = $this->get_credentials('net');
+        
+        try {
+
+            if ($creds === false) {
+                throw new Exception('Net credentials do not exist. Please provide proper username and password');
+            } 
+
+            $this->api_base  = $this::BASE_URL . '/api/';
+            $this->set_header('Authorization', 'Bearer ' . $this->generate_temporary_access_token($creds['refresh_token']));
+            $this->set_header('X_XSRF', 'X_XSRF');
+            print_r($this->headers);
+
+        } catch(Exception $e) {
+
+            echo $e->getMessage();
+
+        }
     }
 
     /**
@@ -59,7 +75,7 @@ class Net extends BaseApi
      * that an application such as this provides... We generate an access token every time a request is made
      * @return [string] [temporary access token for all api requests]
      */
-	protected function generate_temporary_access_token() 
+	protected function generate_temporary_access_token(string $token) 
     {
         $client = new GuzzleHttp\Client(['base_uri' => 'https://www.estatesales.net']);
 
@@ -69,7 +85,7 @@ class Net extends BaseApi
 
         $form_params = [
             'grant_type' => 'refresh_token',
-            'refresh_token' => $this->refresh_token
+            'refresh_token' => $token
         ];
 
         $response = $client->post('/token', [ 'headers' => $headers, 'form_params' => $form_params ]);
@@ -155,11 +171,11 @@ class Net extends BaseApi
         return $this->create(
             'sale-pictures', 
             [
-            'saleId'       => $this->listingId,
-            'description'  => $image['description'],
-            'url'          => $image['website_url'],
-            'imageData'    => $this->convert_image_to_byte_array($image['url']),
-            'thumbnailUrl' => $image['url']
+                'saleId'       => $this->listingId,
+                'description'  => $image['description'],
+                'url'          => $image['website_url'],
+                'imageData'    => $this->convert_image_to_byte_array($image['url']),
+                'thumbnailUrl' => $image['url']
             ]
         )->id;
     }
@@ -170,7 +186,10 @@ class Net extends BaseApi
      * @return an array newly posted image ids
      */
     public function post_images() {
-        return array_map([$this, 'post_image'], $this->images);
+        if (!empty($this->images)) {
+            return array_map([$this, 'post_image'], $this->images);
+        }
+        return;
     }
 
     protected function post_date($date) 
@@ -287,6 +306,6 @@ class Net extends BaseApi
 //     ]
 // ];
 
-$net = new Net($details, $images, $dates, $creds['net']['refresh_token']);
+$net = new Net($details, $images, $dates);
 
-$net->create_sale();
+// $net->create_sale();

@@ -13,6 +13,17 @@ abstract class BaseApi
 
     abstract protected function set_api_base();
 
+    protected function get_credentials(string $type) 
+    {
+        $creds = require 'api_credentials.php';
+
+        if (array_key_exists($type, $creds)) {
+            return $creds[$type];
+        }
+
+        return false;
+    }
+
     /**
      * for better usability of GuzzleHttp\Client instantiation
      * @return [obj]
@@ -27,12 +38,7 @@ abstract class BaseApi
         $this->$name = $value;
     }
 
-    public function __get(string $name) 
-    {
-        return $this->$name;
-    }
-
-    protected function set_header(string $type, string $value) 
+    protected function set_header(string $type, $value) 
     {
         $this->headers[$type] = $value;
     }
@@ -96,4 +102,4 @@ abstract class BaseApi
     {
         return gmdate("Y-m-d\TH:i:s\Z", strtotime($date));
     }
-}
+};
