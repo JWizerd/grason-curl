@@ -13,6 +13,14 @@ abstract class BaseApi
 
     abstract protected function set_api_base();
 
+    /**
+     * The implementation of this method ensures that child classes 
+     * and more importantly, instantiated classes do not have direct access
+     * to credentials. This prevents security measures such as full object display
+     * via printing, __string(), and echo properties that could reveal sensitive information.
+     * @param  string $type the type of credential you need
+     * @return return the nested array of creds if exists
+     */
     protected function get_credentials(string $type) 
     {
         $creds = require 'api_credentials.php';
