@@ -13,6 +13,8 @@ class Org extends BaseApi
         $this->account     = $details['account'];
         $this->title       = $details['title'];
         $this->description = $details['description'];
+        $this->images      = $images;
+        $this->dates       = $dates;
         $this->base_query  =
           [
             'user_key'    => $this->account,
@@ -39,7 +41,7 @@ class Org extends BaseApi
 
             $this->api_base  = $this::BASE_URL;
             $this->set_header('Authorization', 'Basic ' . base64_encode($creds['username'] . ':' . $creds['password']));
-
+            $this->set_header('Content-Type', 'application/x-www-form-urlencoded');
         } catch(Exception $e) {
 
             echo $e->getMessage();
@@ -53,19 +55,7 @@ class Org extends BaseApi
    */
     protected function set_coordinates() 
     {
-        $response = json_decode(
-            $this->api()->request(
-                'POST', 
-                'geocode/get', 
-                [
-                    'headers' => [
-                        'Content-Type' => 'application/x-www-form-urlencoded',
-                        'Authorization' => $this->headers['Authorization']
-                    ],
-                    'form_params' => $this->base_query
-                ]
-            )->getBody()
-        );
+        $response = $this->post_form('geocode/get', $this->base_query);
 
         $this->base_query['lat'] = $response->location->lat;
         $this->base_query['lon'] = $response->location->lon;
@@ -80,7 +70,7 @@ class Org extends BaseApi
   protected function display_listing($user_key, $listing_id, $show_hide) 
   {
     
-    $this->create(
+    $this->post_form(
         'sale/publish/set', 
         [
           
@@ -93,13 +83,14 @@ class Org extends BaseApi
 
   }
 
-  protected function hide_listing($post_id, $account = '') 
+  public function hide_listing($id) 
   {
 
-    $info = Listing::get($post_id);
-    $user_key = $user_key || $info['user_key'];
-    $listing_id = $info['listing_id'];
-    $this->display_listing($account, $listing_id, 'false');
+    // $info = Listing::get($post_id);
+    // $user_key = $user_key || $info['user_key'];
+    // $listing_id = $info['listing_id'];
+
+    $this->display_listing($this->account, $id, 'false');
 
   }
 
@@ -110,9 +101,10 @@ class Org extends BaseApi
    */
   public function create_listing() 
   {
-    $this->id = $this->post_sale();
-    // $this->post_images();
-    // $this->display_listing($this->user_key, $this->id, 'true'); 
+    $this->id = $this->post_sale()->sale->id;
+    print_r($this->id);
+    $this->post_images();
+    $this->display_listing($this->account, $this->id, 'true'); 
   } 
 
   protected function post_sale() 
@@ -122,26 +114,12 @@ class Org extends BaseApi
     $params['descr'] = $this->description;
     $params['dates'] = json_encode(
         [
-            '2014-12-09' => ['09:00','14:00'], 
-            '2014-12-10' => ['08:30']
+            '2018-4-28' => ['09:00','14:00'], 
+            '2018-4-29' => ['08:30']
         ]
     );
 
-    print_r($params);
-
-    return json_decode(
-        $this->api()->request(
-            'POST', 
-            'sale/set', 
-            [
-                'headers' => [
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                    'Authorization' => $this->headers['Authorization']
-                ],
-                'form_params' => $params
-            ]
-        )->getBody()
-    );
+    return $this->post_form('sale/set', $params);
   }
 
   /**
@@ -151,13 +129,14 @@ class Org extends BaseApi
    */
   protected function post_image(array $image) 
   {
-    return $this->create(
+    return $this->post_form(
         'sale/photo/remote/add', 
         [
+            'user_key' => $this->account,
             'sale_id' => $this->id,
-            'url' => wp_get_attachment_url($image['field_5a69fa961c0b7'])
+            'url' => $image['url']
         ]
-    )->id;
+    );
   }
 
   /**
@@ -226,19 +205,27 @@ class Org extends BaseApi
 
 }
 
-$details = [
-    'account' => '5749-0950-0d1d-4c13-9ed8-6154',
-    'title' => 'Sample',
-    'description' => 'Sample',
-    'address' => '3608 Madison Ave',
-    'city' => 'loveland',
-    'state' => 'CO',
-    'zip' => '80538'
-];
-
-$images = [];
-$dates = [];
-
 $org = new Org($details, $images, $dates);
 
-$org->create_listing();
+// $details = [
+//     'account' => '5749-0950-0d1d-4c13-9ed8-6154',
+//     'title' => 'TESTING CREATE',
+//     'description' => 'Sample',
+//     'address' => '3608 Madison Ave',
+//     'city' => 'loveland',
+//     'state' => 'CO',
+//     'zip' => '80538'
+// ];
+
+// $images = [
+//     [
+//         'description' => 'sample desc',
+//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
+//         'website_url' => '"https://grasons.com'
+//     ]
+// ];
+
+// $dates = [];
+
+// print_r($org->create_listing());
+// $org->hide_listing(1509299);
