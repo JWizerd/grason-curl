@@ -13,6 +13,7 @@ class Org extends BaseApi
         $this->account     = $details['account'];
         $this->title       = $details['title'];
         $this->description = $details['description'];
+        $this->url         = $details['url'];
         $this->base_query  =
           [
             'user_key'    => $this->account,
@@ -119,29 +120,9 @@ class Org extends BaseApi
   {
     $params = $this->base_query;
     $params['title'] = $this->title;
-    $params['descr'] = $this->description;
-    $params['dates'] = json_encode(
-        [
-            '2014-12-09' => ['09:00','14:00'], 
-            '2014-12-10' => ['08:30']
-        ]
-    );
-
-    print_r($params);
-
-    return json_decode(
-        $this->api()->request(
-            'POST', 
-            'sale/set', 
-            [
-                'headers' => [
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                    'Authorization' => $this->headers['Authorization']
-                ],
-                'form_params' => $params
-            ]
-        )->getBody()
-    );
+    $params['description'] = $this->description;
+    $params['external_url'] = $this->url;
+    return $this->create('sale/set', $params)->id;
   }
 
   /**
@@ -233,7 +214,8 @@ $details = [
     'address' => '3608 Madison Ave',
     'city' => 'loveland',
     'state' => 'CO',
-    'zip' => '80538'
+    'zip' => '80538',
+    'url' => 'http://example.com'
 ];
 
 $images = [];
