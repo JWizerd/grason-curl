@@ -4,11 +4,9 @@
  * @author  Jeremiah Wodke <[<jeremiah.wodke@madwiremedia.com>]> 2018
  */
 
-require '../BaseApi.php';
-
 class Net extends BaseApi 
 {
-	const BASE_URL = 'https://www.estatesales.net';
+    const BASE_URL = 'https://www.estatesales.net';
 
     /**
      * the default sale type for 'EstateSale' as defined by .net
@@ -27,44 +25,51 @@ class Net extends BaseApi
      */
     const SHOW_ADDRESS_TYPE = 1;
 
-    protected $token;
-
-	public function __construct(array $details, $images = [], array $dates)  
+    public function __construct(array $details, $images = [], $dates = [])  
     {
-        $this->orgId         = $details['account'];
-        $this->name          = $details['title'];
-        $this->description   = $details['description'];
-        $this->address       = $details['address'];
-        $this->zip           = $details['zip'];
-        $this->url           = $details['url'];
+        $this->company     = $details['net_id'];
+        $this->post        = $details['post_id'];
+        $this->name        = $details['title'];
+        $this->description = $details['description'];
+        $this->address     = $details['address'];
+        $this->zip         = $details['zip'];
+        $this->url         = $details['url'];
+        $this->timezone    = $details['timezone'];
         $this->set_api_base();
-        $this->images        = $images;
-        $this->dates         = $dates;
-	}
+
+        if (!empty($images)) {
+          $this->images = $images;
+        }
+        
+        if (!empty($dates)) {
+          $this->format_dates($dates);
+        }
+    }
 
     /**
      * use this when building all Guzzle requests EXCEPT @see SELF::generate_temporary_access_token()
      */
     protected function set_api_base() 
     {
-
-        $creds = $this->get_credentials('net');
+        if (!is_null($this->company)) {
         
-        try {
+            $creds = $this->get_credentials('net');
+            
+            try {
 
-            if ($creds === false) {
-                throw new Exception('Net credentials do not exist. Please provide proper username and password');
-            } 
+                if ($creds === false) {
+                    throw new Exception('Net credentials do not exist. Please provide proper username and password');
+                } 
 
-            $this->api_base  = $this::BASE_URL . '/api/';
-            $this->set_header('Authorization', 'Bearer ' . $this->generate_temporary_access_token($creds['refresh_token']));
-            $this->set_header('X_XSRF', 'X_XSRF');
-            print_r($this->headers);
+                $this->api_base  = $this::BASE_URL . '/api/';
+                $this->set_header('Authorization', 'Bearer ' . $this->generate_temporary_access_token($creds['refresh_token']));
+                $this->set_header('X_XSRF', 'X_XSRF');
 
-        } catch(Exception $e) {
+            } catch(Exception $e) {
 
-            echo $e->getMessage();
+                echo $e->getMessage();
 
+            }
         }
     }
 
@@ -74,7 +79,7 @@ class Net extends BaseApi
      * that an application such as this provides... We generate an access token every time a request is made
      * @return [string] [temporary access token for all api requests]
      */
-	protected function generate_temporary_access_token(string $token) 
+    protected function generate_temporary_access_token(string $token) 
     {
         $client = new GuzzleHttp\Client(['base_uri' => 'https://www.estatesales.net']);
 
@@ -90,7 +95,7 @@ class Net extends BaseApi
         $response = $client->post('/token', [ 'headers' => $headers, 'form_params' => $form_params ]);
 
         return json_decode($response->getBody())->access_token;
-	}
+   }
 
     /**
      * POST a sale to a .net account
@@ -99,21 +104,25 @@ class Net extends BaseApi
      */
     protected function post_sale() 
     {
-        return $this->create(
-            'public-sales',
-            [
-                'orgId'            => $this->orgId,
-                'saleType'         => $this::SALE_TYPE,
-                'postalCodeNumber' => $this->zip,
-                'address'          => $this->address,
-                'name'             => $this->name,
-                'description'      => $this->description,
-                'showAddressType'  => $this::SHOW_ADDRESS_TYPE,
-                'url'              => $this->url,
-                'terms'            => '',
-                'directions'       => ''
-            ]
-        );
+        try {
+            return $this->create(
+                'public-sales',
+                [
+                    'orgId'            => $this->company,
+                    'saleType'         => $this::SALE_TYPE,
+                    'postalCodeNumber' => $this->zip,
+                    'address'          => $this->address,
+                    'name'             => $this->name,
+                    'description'      => $this->description,
+                    'showAddressType'  => $this::SHOW_ADDRESS_TYPE,
+                    'url'              => $this->url,
+                    'terms'            => '',
+                    'directions'       => ''
+                ]
+            );
+        } catch(GuzzleHttp\Exception\ClientException $e) {
+            return;
+        }
     }
 
     /**
@@ -167,16 +176,21 @@ class Net extends BaseApi
      */
     protected function post_image(array $image) 
     {
-        return $this->create(
-            'sale-pictures', 
-            [
-                'saleId'       => $this->listingId,
-                'description'  => $image['description'],
-                'url'          => $image['website_url'],
-                'imageData'    => $this->convert_image_to_byte_array($image['url']),
-                'thumbnailUrl' => $image['url']
-            ]
-        )->id;
+        try {
+            return $this->create(
+                'sale-pictures',
+                /**
+                 * @todo using BaseApi::get_attachment_urls() first change it get attachment array. Then correctly pass data to this function and all other post image methods.
+                 */
+                [
+                    'saleId'       => $this->id,
+                    'imageData'    => $this->convert_image_to_byte_array($image['url']),
+                    'thumbnailUrl' => $image['url']
+                ]
+            )->id;
+        } catch (GuzzleHttp\Exception\ServerException $e) {
+            return;
+        }
     }
 
     /**
@@ -184,25 +198,75 @@ class Net extends BaseApi
      * @param  array  $images ACF Gallery Collection
      * @return an array newly posted image ids
      */
-    public function post_images() 
-    {
+    public function post_images() {
         if (!empty($this->images)) {
             return array_map([$this, 'post_image'], $this->images);
         }
         return;
     }
 
+    /**
+     * Method that is ran inside of the constructor which 
+     * normalizes the ACF dates array for easier usage 
+     * IF dates (Y-M-D) are equal to each other stop execution
+     * IF date 2 (Y-M-D) is greater than date 1 by 4 days stop execution
+     * @param  string $date ACF datetime
+     */
+    public function format_dates(array $dates) 
+    {
+        if (!empty($dates[1])) {
+            if (
+                strtotime($dates[0]['sale_date_picker']) !== strtotime($dates[1]['sale_date_picker'])
+                ||
+                strtotime($dates[1]['sale_date_picker']) < strtotime($this->format_date($dates[0]['sale_date_picker'], 'Y-m-d', '+4 days'))
+            ) {
+                $this->formatter($dates);
+            } else {
+                return;
+            }   
+        } else {
+            $this->formatter($dates);
+        }
+    }
+
+    protected function formatter(array $dates) 
+    {
+        $formatted = [];
+        $format = 'Y-m-d\TH:i:s\Z';
+        foreach ($dates as $date) {
+            $formatted[] = 
+                [
+                    'start' => $this->format_date(
+                                    $date['sale_date_picker'] . ' ' . $date['sale_date_start_time'], 
+                                    $format,
+                                    '+6 hours'
+                                ),
+                    'end'   => $this->format_date(
+                                    $date['sale_date_picker'] . ' ' . $date['sale_date_end_time'], 
+                                    $format,
+                                    '+6 hours'
+                                )
+                ];
+        }
+
+        $this->dates = $formatted;   
+    }
+
     protected function post_date($date) 
     {
-        return $this->create(
-            'sale-dates',
-            [
-                'saleId' => $this->listingId,
-                'utcStartDate' => $this->format_date($date['start']),
-                'utcEndDate' => $this->format_date($date['end']),
-                'showEndTime' => $this::SHOW_END_TIME
-            ]
-        )->id;
+        try {
+            return $this->create(
+                'sale-dates',
+                [
+                    'saleId' => $this->id,
+                    'utcStartDate' => $date['start'],
+                    'utcEndDate' => $date['end'],
+                    'showEndTime' => $this::SHOW_END_TIME
+                ]
+            )->id;
+        } catch (GuzzleHttp\Exception\ServerException $e) {
+            return;
+        }
     }
 
     protected function post_dates()
@@ -221,12 +285,15 @@ class Net extends BaseApi
      */
     public function create_sale() 
     {
-        $this->listingId = $this->post_sale()->id;
-        $images = json_encode($this->post_images());
-        $dates = json_encode($this->post_dates());
+        if (!is_null($this->company)) {
+            $this->id = $this->post_sale()->id;
 
-        echo $images;
-        echo $dates;
+            json_encode($this->post_images());
+
+            if (!empty($this->dates)) {
+                json_encode($this->post_dates());
+            }
+        }
     }
 
     public function update_sale($id) 
@@ -253,8 +320,7 @@ class Net extends BaseApi
         }
     }
 
-    protected function exists($id) 
-    {
+    protected function exists($id) {
         try { 
             $this->get('public-sales/' . (string)$id);
         } catch (GuzzleHttp\Exception\ClientException $e) {
@@ -266,47 +332,8 @@ class Net extends BaseApi
 
     public function delete_sale($id) 
     {
-        $this->delete('public-sales/' . (string)$id);
+        if (!is_null($this->company) && !empty($id)) {
+            $this->delete('public-sales/' . (string)$id);
+        }
     }
-
 }
-
-// testing
-
-// $details = [
-//     'account'     => 23126,
-//     'title'       => 'GRASON TEST FROM APP 2',
-//     'description' =>  'test description',
-//     'address'     => '1714 keyes court',
-//     'zip'         => '80538',
-//     'url'         => 'http://example.com'
-// ];
-
-// $images = [
-//     [
-//         'description' => 'sample desc',
-//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-//         'website_url' => '"https://grasons.com'
-//     ],
-//     [
-//         'description' => 'sample desc 2',
-//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-//         'website_url' => '"https://grasons.com'
-//     ],
-//     [
-//         'description' => 'sample desc 3',
-//         'url' => 'https://grasons.com/wp-content/uploads/2013/06/older-people-smiling.jpg',
-//         'website_url' => '"https://grasons.com'
-//     ]
-// ];
-
-// $dates = [
-//     [
-//         'start' => date("Y-m-d H:i:s"),
-//         'end' => '2018-04-27 23:06:17'
-//     ]
-// ];
-
-$net = new Net($details, $images, $dates);
-
-// $net->create_sale();

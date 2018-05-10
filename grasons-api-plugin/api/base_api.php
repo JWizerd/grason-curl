@@ -13,6 +13,17 @@ abstract class BaseApi
 
     abstract protected function set_api_base();
 
+    abstract protected function format_dates(array $dates);
+
+    protected function format_date($time, $format = null, $modify = null)
+    {
+        if (!is_null($modify)) {
+            return (new DateTime($time))->modify($modify)->format($format);    
+        }
+
+        return (new DateTime($time))->format($format);
+    }
+
     /**
      * The implementation of this method ensures that child classes 
      * and more importantly, instantiated classes do not have direct access
@@ -111,15 +122,5 @@ abstract class BaseApi
                 'headers' => $this->headers
             ]
         );
-    }
-
-    /**
-     * Date format must be in 
-     * @param  string $date ACF datetime
-     * @return string TZ - UTC formated datetime 
-     */
-    protected function format_date(string $date) 
-    {
-        return gmdate("Y-m-d\TH:i:s\Z", strtotime($date));
     }
 };
