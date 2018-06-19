@@ -2,10 +2,10 @@
 
 class DB 
 {
-  protected $host    = 'localhost';
-  protected $db      = 'grasonsc_wp';
-  protected $user    = 'grasonsc_admin';
-  protected $pass    = 'OOFTd[P133Dh';
+  protected $host    = '';
+  protected $db      = '';
+  protected $user    = '';
+  protected $pass    = '';
   protected $charset = 'utf8mb4';
   public $pdo;
 
