@@ -2,10 +2,10 @@
 
 class DB 
 {
-  protected $host    = 'localhost';
-  protected $db      = 'grason_curl_wordpress';
-  protected $user    = 'root';
-  protected $pass    = 'root';
+  protected $host    = '';
+  protected $db      = '';
+  protected $user    = '';
+  protected $pass    = '';
   protected $charset = 'utf8mb4';
   public $pdo;
 
